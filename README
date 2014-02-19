@@ -1,0 +1,5 @@
+RAMSIN_DINAMICA_PURA: Soh dinamica + modelo de solo (leaf) a ser removido posteriormente (inserir isfc=-1)
+Xmit.sh: pbs script para uma submissao nao bloqueante
+XBlock.sh: pbs script para submissao bloqueante
+RunMany.sh: script invocando XBlock.sh variando numero de processadores para testar reprodutibilidade
+

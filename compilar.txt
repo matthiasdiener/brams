@@ -1,0 +1,5 @@
+ssh login3
+module swap PrgEnv-cray PrgEnv-pgi
+module load hdf5-parallel
+cd <...>/build/bin/
+make -f Make_model OPT=opt.pgi-cray CHEM=CB07_TUV

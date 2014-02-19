@@ -1,0 +1,1235 @@
+!--------------------------------------------------------------------------------!
+! Cumulus Parameterization by G. Grell - versions 3d and GD-FIM                  !
+! Implemented in BRAMS by S. Freitas @ Feb/2012                                  !
+! Rafael Mello: included parallelization for spread/g3d_smoothh arrays               !
+!--------------------------------------------------------------------------------!
+
+MODULE CUPARM_GRELL3
+
+  use ModNamelistFile, only: namelistFile
+   
+  use ModMessageSet, only: &
+      PostRecvSendMsgs, &
+      WaitRecvMsgs
+       
+  use mem_basic         , only: basic_g
+  use mem_tend          , only: tend
+  use mem_cuparm        , only: confrq,cuparm_g,cuparm_g_sh
+  use node_mod          , only: mynum,   &   ! INTENT(IN)
+             		        mxp,     &   ! INTENT(IN)
+             		        myp,     &   ! INTENT(IN)
+             		        mzp,     &   ! INTENT(IN)
+             		        ia,      &   ! INTENT(IN)
+             		        iz,      &   ! INTENT(IN)
+             		        ja,      &   ! INTENT(IN)
+             		        jz,      &   ! INTENT(IN)
+             		        i0,      &   ! INTENT(IN)  
+             		        j0	     ! INTENT(IN) 
+  use mem_grid          , only: time,    &   ! INTENT(IN)
+            		   	initial, &   ! INTENT(IN)
+            		   	dtlt,	 &   ! INTENT(IN)
+            		   	itime1,  &   ! INTENT(IN)
+            		   	ngrid,   &   ! INTENT(IN)
+            		   	grid_g,  &   ! INTENT(IN)  	  
+            		   	dtlongn, &   ! INTENT(IN)
+           		   	deltaxn, &   ! INTENT(IN)
+           		   	deltayn, &   ! INTENT(IN)
+				npatch,  &   ! INTENT(IN)
+				   ztn,  &   ! INTENT(IN)
+				   zmn       ! INTENT(IN)
+				
+
+  use rconstants        , only: tkmin 
+! use extras            , only: extra3d,extra2d,na_EXTRA3D ,na_EXTRA2D
+  use mem_turb          , only: turb_g
+  use mem_micro         , only: micro_g
+! use mem_scratch       , only: scratch
+!srf
+  use io_params         , only: frqanl
+  use mem_leaf          , only: leaf_g
+  use micphys           , only: level
+
+!- use modules for Grell Parameterization
+  use mem_grell_param   , only: mgmxp,mgmyp,mgmzp,maxiens,ngrids_cp,&
+       maxens_g3d ,                        & !INTENT(IN)
+       maxens2_g3d,                        & !INTENT(IN)
+       maxens3_g3d,                        & !INTENT(IN)
+       ensdim_g3d ,                        & !INTENT(IN)
+       maxens ,                        & !INTENT(IN)
+       maxens2,                        & !INTENT(IN)
+       maxens3,                        & !INTENT(IN)
+       ensdim ,                        & !INTENT(IN)
+       icoic                 
+
+  use mem_scratch1_grell, only: ierr4d,jmin4d,kdet4d,k224d,kbcon4d,ktop4d,kpbl4d,   &
+                                kstabi4d,kstabm4d,xmb4d,edt4d,pwav4d,               &
+                                zup5d, zdn5d,iruncon, pcup5d, prup5d,prdn5d, &
+				clwup5d,tup5d,                                      &
+                                up_massdetr5d, up_massentr5d,                       &
+                                dd_massdetr5d, dd_massentr5d
+
+
+  use mem_grell         , only: cuforc_g,cuforc_sh_g
+
+  !- incluindo o efeito de aerosois na precipitação
+  use mem_carma, only: carma
+
+  use mem_radiate, only: ISWRTYP, ILWRTYP,radiate_g ! Intent(in)
+
+!-----------Grell G3d - GD-FIM - GF
+  use module_cu_g3    , only:  G3DRV
+  use module_cu_gd_fim, only:  GRELLDRV_FIM
+  use module_cu_gf    , only:  GFDRV
+
+  USE Phys_const, only: cp, p00, tcrit, g, cpor , XL, rm,rgas
+  
+!----------- 
+
+  use ccatt_start, only: ccatt 
+  
+  implicit none
+
+  TYPE g3d_ens_vars   
+     REAL, POINTER, DIMENSION(:,:)  ::apr
+     REAL, POINTER, DIMENSION(:,:)  ::accapr
+     REAL, POINTER, DIMENSION(:,:)  ::weight
+     !-----------
+  END TYPE g3d_ens_vars
+  TYPE (g3d_ens_vars)    , allocatable :: g3d_ens_g(:,:),g3d_ensm_g(:,:)
+ 
+  TYPE g3d_vars   
+     REAL, POINTER, DIMENSION(:,:  )  ::xmb_deep 
+     REAL, POINTER, DIMENSION(:,:  )  ::xmb_shallow
+     REAL, POINTER, DIMENSION(:,:,:)  ::cugd_ttens
+     REAL, POINTER, DIMENSION(:,:,:)  ::cugd_qvtens
+     REAL, POINTER, DIMENSION(:,:,:)  ::thsrc
+     REAL, POINTER, DIMENSION(:,:,:)  ::rtsrc
+     REAL, POINTER, DIMENSION(:,:,:)  ::clsrc
+  END TYPE g3d_vars
+  
+  TYPE (g3d_vars)       , allocatable :: g3d_g(:),g3dm_g(:)
+  
+  integer ::    ids,ide, jds,jde, kds,kde            & 
+               ,ims,ime, jms,jme, kms,kme            & 
+               ,ips,ipe, jps,jpe, kps,kpe            & 
+               ,its,ite, jts,jte, kts,kte  
+
+  
+  integer,parameter :: ishallow_g3 = 0, imomentum=0 
+  
+  !- define if the training will be used or not (latter send to namelist & read training file function at master node)
+  INTEGER,PARAMETER:: training=1
+  character(len=255) :: g3d_training_file
+    
+  !- define if the lateral subsidence spread will be done or not (latter send to namelist)
+  INTEGER :: g3d_spread ! 1=ON, 0=OFF
+  INTEGER :: cugd_avedx
+  
+  !- define if the horizontal smoothing is to be done or not (latter send to namelist)
+  INTEGER :: g3d_smoothh! 1=ON, 0=OFF
+  
+  !- define if the vertical smoothing is to be done or not (latter send to namelist)
+  INTEGER :: g3d_smoothv! 1=ON, 0=OFF
+
+  !- number of members of prec ensemble 
+  INTEGER,PARAMETER :: train_dim= 5
+
+  CHARACTER(LEN=6),PARAMETER,DIMENSION(train_dim) :: pre_name=(/ &
+      'apr_gr' & !
+     ,'apr_w ' & !
+     ,'apr_mc' & !
+     ,'apr_st' & !
+     ,'apr_as' & !
+   /)
+  
+  INTEGER,PARAMETER :: apr_gr=001
+  INTEGER,PARAMETER :: apr_w =002
+  INTEGER,PARAMETER :: apr_mc=003
+  INTEGER,PARAMETER :: apr_st=004
+  INTEGER,PARAMETER :: apr_as=005
+ 
+
+  integer,parameter :: CPTIME = 0. !orig: CPTIME = 7200.
+
+  integer,parameter :: i_forcing = 1
+
+  integer,parameter :: autoconv = 1!2 ! =1, Kessler
+                                      ! =2, Berry 
+  integer,parameter :: aerovap = 1!3  ! =1, orig
+                                    ! =2, mix orig+new
+				    ! =3, new 
+  integer,parameter :: do_cupar_mcphys_coupling = 1 ! direct link cupar-microphysics
+                        			    ! =0 , no coupling
+
+
+
+Contains
+!-----------------------------------------
+  subroutine nullify_grell3(g3d_ens,g3d,ndim_train)
+
+    implicit none
+    integer, intent(in) ::ndim_train
+    type (g3d_ens_vars),dimension(ndim_train) :: g3d_ens
+    type (g3d_vars) :: g3d
+    integer i
+ 
+    do i=1,ndim_train
+      if (associated(g3d_ens(i)%apr))    nullify (g3d_ens(i)%apr)
+      if (associated(g3d_ens(i)%accapr)) nullify (g3d_ens(i)%accapr)
+      if (associated(g3d_ens(i)%weight)) nullify (g3d_ens(i)%weight)
+    enddo
+    
+    if (associated(g3d%xmb_deep))    nullify (g3d%xmb_deep)
+    if (associated(g3d%xmb_shallow)) nullify (g3d%xmb_shallow)
+
+    if (associated(g3d%cugd_ttens))  nullify (g3d%cugd_ttens)
+    if (associated(g3d%cugd_qvtens)) nullify (g3d%cugd_qvtens)
+
+    if (associated(g3d%thsrc)) nullify (g3d%thsrc)
+    if (associated(g3d%rtsrc)) nullify (g3d%rtsrc)
+    if (associated(g3d%clsrc)) nullify (g3d%clsrc)
+ 
+  end subroutine nullify_grell3
+!-----------------------------------------
+   subroutine alloc_grell3(g3d_ens,g3d, m1, m2, m3, ng,ndim_train)
+    implicit none
+    type (g3d_ens_vars),dimension(ndim_train) :: g3d_ens
+    type (g3d_vars) :: g3d
+    integer, intent(in) :: m1, m2, m3, ng,ndim_train
+    integer :: i
+
+    
+    do i=1,ndim_train
+       allocate(g3d_ens(i)%apr   (m2,m3))   ; g3d_ens(i)%apr    =0.0
+       allocate(g3d_ens(i)%accapr(m2,m3))   ; g3d_ens(i)%accapr =0.0
+       allocate(g3d_ens(i)%weight(m2,m3))   ; g3d_ens(i)%weight =0.0
+    enddo
+
+
+    allocate (g3d%xmb_deep   (m2,m3))       ;g3d%xmb_deep   =0.0
+    allocate (g3d%xmb_shallow(m2,m3))       ;g3d%xmb_shallow=0.0
+    
+    allocate (g3d%cugd_ttens (m1, m2, m3))  ;g3d%cugd_ttens =0.0
+    allocate (g3d%cugd_qvtens(m1, m2, m3))  ;g3d%cugd_qvtens=0.0
+
+    allocate (g3d%thsrc(m1, m2, m3))  ;g3d%thsrc=0.0
+    allocate (g3d%rtsrc(m1, m2, m3))  ;g3d%rtsrc=0.0
+    allocate (g3d%clsrc(m1, m2, m3))  ;g3d%clsrc=0.0
+
+  end subroutine alloc_grell3
+  
+!-----------------------------------------
+  subroutine filltab_grell3(g3d_ens,g3d,g3d_ensm,g3dm,imean, m1, m2, m3, ng,ndim_train)
+    use var_tables
+    implicit none
+    include "i8.h"
+
+    type (g3d_ens_vars),dimension(ndim_train) :: g3d_ens,g3d_ensm
+    type (g3d_vars) :: g3d,g3dm
+    integer, intent(in) :: imean, m1, m2, m3, ng,ndim_train
+    integer(kind=i8) :: npts 
+    integer :: i
+    character (len=4) :: arrprop
+    ! Fill pointers to arrays into variable tables
+
+    npts=m2*m3
+    do i=1,ndim_train
+     if (associated(g3d_ens(i)%apr))  &
+         call InsertVTab (g3d_ens(i)%apr   ,g3d_ensm(i)%apr    &
+         ,ng, npts, imean,  &
+         trim(pre_name(i))//' :2:hist:mpti:mpt3')
+     
+     if (associated(g3d_ens(i)%accapr))  &
+         call InsertVTab (g3d_ens(i)%accapr   ,g3d_ensm(i)%accapr    &
+         ,ng, npts, imean,  &
+         'acc'//trim(pre_name(i)(2:len_trim(pre_name(i))))//' :2:hist:anal:mpti:mpt3')
+    enddo
+
+    do i=1,ndim_train
+     if (associated(g3d_ens(i)%weight))  &
+         call InsertVTab (g3d_ens(i)%weight   ,g3d_ensm(i)%weight    &
+         ,ng, npts, imean,  &
+         'weight'//trim(pre_name(i)(4:len_trim(pre_name(i))))//' :2:hist:anal:mpti:mpt3')
+     
+    enddo
+    
+    if (associated(g3d%xmb_deep))  &
+         call InsertVTab (g3d%xmb_deep   ,g3dm%xmb_deep    &
+         ,ng, npts, imean,  &
+         'UPMF :2:hist:anal:mpti:mpt3')
+       if (associated(g3d%xmb_shallow))  &
+         call InsertVTab (g3d%xmb_shallow   ,g3dm%xmb_shallow    &
+         ,ng, npts, imean,  &
+         'UPMFSH3 :2:hist:anal:mpti:mpt3')
+    !- 3D Arrays
+    npts=m1*m2*m3
+     
+    !- define if the arrays will exchange 1 row x 1 line (not in use anymore)
+    arrprop=''
+    !if(g3d_spread == 1) arrprop='mpt1'
+    
+    if (associated(g3d%cugd_ttens))  &
+         call InsertVTab (g3d%cugd_ttens     ,g3dm%cugd_ttens      &
+         ,ng, npts, imean,  &
+         'TTENS :3:hist:anal:mpti:mpt3'//trim(arrprop))
+
+    if (associated(g3d%cugd_qvtens))  &
+         call InsertVTab (g3d%cugd_qvtens    ,g3dm%cugd_qvtens     &
+         ,ng, npts, imean,  &
+         'QVTTENS :3:hist:anal:mpti:mpt3'//trim(arrprop))
+
+    !arrprop=''
+    !if(g3d_smoothh == 1) arrprop='mpt1'
+ 
+    if (associated(g3d%thsrc))  &
+         call InsertVTab (g3d%thsrc     ,g3dm%thsrc      &
+         ,ng, npts, imean,  &
+         'THSRC :3:hist:anal:mpti:mpt3'//trim(arrprop))
+
+    if (associated(g3d%rtsrc))  &
+         call InsertVTab (g3d%rtsrc     ,g3dm%rtsrc     &
+         ,ng, npts, imean,  &
+         'RTSRC :3:hist:anal:mpti:mpt3'//trim(arrprop))
+
+    !- this array does not need to be parallelized (only column)
+    if (associated(g3d%clsrc))  &
+         call InsertVTab (g3d%clsrc     ,g3dm%clsrc     &
+         ,ng, npts, imean,  &
+         'CLSRC :3:hist:anal:mpti:mpt3')
+
+
+     
+  end subroutine filltab_grell3
+!-------------------------------------------------------------
+ 
+subroutine CUPARM_GRELL3_CATT(OneGrid, iens,iinqparm)
+
+!--(DMK-CCATT-INI)-----------------------------------------------------------
+    USE mem_radiate, ONLY: &
+         ilwrtyp, iswrtyp        ! INTENT(IN)
+    use ModGrid, only: &
+         Grid
+!--(DMK-CCATT-FIM)-----------------------------------------------------------
+
+  implicit none
+  
+  include "i8.h"
+  integer, intent(IN) :: iens,iinqparm
+  type(Grid), pointer :: OneGrid ! intent(in)
+  integer :: i
+  real :: grid_length
+
+!--(DMK-CCATT-INI)-----------------------------------------------------------
+  REAL, DIMENSION( mxp , myp ) :: aot500 !LFR adapt do UKMO 
+!--(DMK-CCATT-FIM)-----------------------------------------------------------
+  
+	if(initial.eq.2.and.time.lt.cptime-dtlt) return
+        
+	if(mod(time,confrq).lt.dtlt.or.time.lt. .01 .or.abs(time-cptime) .lt. 0.01) then !002
+
+        !-start convective transport of tracers
+	iruncon=1
+        !        
+        !
+        g3d_g(ngrid)%thsrc = 0.
+        g3d_g(ngrid)%rtsrc = 0.
+        g3d_g(ngrid)%clsrc = 0.
+        g3d_g(ngrid)%cugd_ttens = 0.
+        g3d_g(ngrid)%cugd_qvtens = 0.
+        cuparm_g(ngrid)%conprr = 0.
+		
+        !srf - use the old way to define the cumulus forcing
+
+	if(i_forcing /= 1) then
+        	call atob(mxp * myp * mzp,tend%THT  ,cuforc_g(ngrid)%lsfth     )
+        	call atob(mxp * myp * mzp,tend%RTT  ,cuforc_g(ngrid)%lsfrt     )
+        endif	
+
+!srf ----- tmp
+!       cuforc_g(ngrid)%lsfth=3.*cuforc_g(ngrid)%lsfth
+!       cuforc_g(ngrid)%lsfrt=3.*cuforc_g(ngrid)%lsfrt
+!srf ------tmp
+
+
+	!- converting WRF setting to BRAMS
+        ids=1   ;ide=mxp ;jds=1   ;jde=myp ;kds=1; kde=mzp	      
+	ims=1   ;ime=mxp ;jms=1   ;jme=myp ;kms=1; kme=mzp			
+	ips=ia+1;ipe=iz-2;jps=ja+1;jpe=jz-2;kps=1; kpe=mzp			  
+	its=ia  ;ite=iz  ;jts=ja  ;jte=jz  ;kts=1; kte=mzp-1  
+
+        grid_length=sqrt(deltaxn(ngrid)*deltayn(ngrid))
+
+!print*  ,ids,ide, jds,jde, kds,kde                        & 
+!        ,ims,ime, jms,jme, kms,kme			   & 
+!        ,ips,ipe, jps,jpe, kps,kpe			   & 
+!        ,its,ite, jts,jte, kts,kte			   & 
+!-------------------------------------------------------------
+!-------------------------------------------------------------
+!-------------------------------------------------------------
+!-------------------------------------------------------------
+if(iinqparm==3) then  ! G3d scheme 
+   !
+   !- lateral spreading
+   if(g3d_spread == 0 )cugd_avedx=1
+   if(g3d_spread == 1 )cugd_avedx=3
+
+!--(DMK-CCATT-INI)-----------------------------------------------------------
+!LFR
+   if(ilwrtyp==4 .or. iswrtyp==4) THEN
+   	aot500(:,:)=carma(ngrid)%aot(:,:,11)
+   else
+   	aot500(:,:)=0.0
+   end if
+!--(DMK-CCATT-FIM)-----------------------------------------------------------
+
+   CALL G3DRV( mynum,i0,j0,time             &
+              ,dtlt         		    & !
+              ,grid_length                  & !
+              ,autoconv                     & !
+              ,aerovap                      & !
+              ,basic_g(ngrid)%dn0           & !
+	      ,cuparm_g(ngrid)%CONPRR       & !
+              ,basic_g(ngrid)%up            & !
+              ,basic_g(ngrid)%vp            & !
+              ,basic_g(ngrid)%theta         & !
+              ,basic_g(ngrid)%thp           & !
+              ,basic_g(ngrid)%pp            & !
+              ,basic_g(ngrid)%pi0           & !
+	      ,basic_g(ngrid)%wp            & !
+	      ,basic_g(ngrid)%rv            & !
+              ,grid_g(ngrid)%RTGT           & !
+              ,tend%PT                      & !
+	      ,XL			    & !
+	      ,CP			    & !
+	      ,G			    & !
+	      ,rm                           &
+	      ,p00                          &
+	      ,cpor                         & !
+              ,g3d_ens_g(apr_gr,ngrid)%apr  &
+              ,g3d_ens_g(apr_w ,ngrid)%apr  &
+              ,g3d_ens_g(apr_mc,ngrid)%apr  &
+              ,g3d_ens_g(apr_st,ngrid)%apr  &
+              ,g3d_ens_g(apr_as,ngrid)%apr  &
+              ,g3d_g(ngrid)%xmb_deep        &
+              ,g3d_g(ngrid)%xmb_shallow     &
+!              
+	      ,g3d_ens_g(apr_gr,ngrid)%weight &
+              ,g3d_ens_g(apr_w ,ngrid)%weight &
+              ,g3d_ens_g(apr_mc,ngrid)%weight &
+              ,g3d_ens_g(apr_st,ngrid)%weight &
+              ,g3d_ens_g(apr_as,ngrid)%weight &
+!
+              ,training &
+!===
+!             ,APR_GR(ims:ime,jms:jme)	       & !
+!	      ,APR_W (ims:ime,jms:jme)	       & !
+!	      ,APR_MC(ims:ime,jms:jme)	       & !
+!	      ,APR_ST(ims:ime,jms:jme)	       & !
+!	      ,APR_AS(ims:ime,jms:jme)         & !
+!             ,APR_CAPMA(ims:ime,jms:jme)      & !
+!	      ,APR_CAPME(ims:ime,jms:jme)      & !
+!	      ,APR_CAPMI (ims:ime,jms:jme)     & !
+!             ,xmb_deep(ims:ime,jms:jme)       & !
+!             ,xmb_shallow (ims:ime,jms:jme)   & !
+!	      ,XF_ENS			       & !
+!	      ,PR_ENS			       & !
+!===
+	      ,grid_g(ngrid)%topt              &
+              ,leaf_g(ngrid)%patch_area        &
+	      ,npatch                          &
+              ,radiate_g(ngrid)%rshort         &
+!===
+!             ,edt_out                          		&
+!             ,GDC						&
+!	      ,GDC2						&
+!	      ,kpbl						&
+!	      ,k22_shallow					&
+!	      ,kbcon_shallow      				& 
+!             ,ktop_shallow					& 
+!===
+	      ,cugd_avedx					& 
+	      ,imomentum          				& 
+!srf          ,ensdim_g3d,maxiens,maxens_g3d,maxens2_g3d,maxens3_g3d,icoic      & 
+              ,ensdim,maxiens,maxens,maxens2,maxens3,icoic      & 
+              ,ishallow_g3                                      & 
+	      ,ids,ide, jds,jde, kds,kde                        & 
+              ,ims,ime, jms,jme, kms,kme                        & 
+              ,ips,ipe, jps,jpe, kps,kpe                        & 
+              ,its,ite, jts,jte, kts,kte                        & 
+!==
+              ,g3d_g(ngrid)%THSRC      & ! temp tendency
+              ,g3d_g(ngrid)%RTSRC      & ! rv tendency
+              ,g3d_g(ngrid)%CLSRC      & ! cloud/ice tendency
+!	      
+              ,g3d_g(ngrid)%cugd_ttens    &
+              ,g3d_g(ngrid)%cugd_qvtens   &
+! forcings -  for deep/shallow
+	      ,cuforc_g(ngrid)%	lsfth     & ! forcing for theta deep
+	      ,cuforc_g(ngrid)%	lsfrt     & ! forcing for rv deep 
+	      ,cuforc_sh_g(ngrid)%lsfth   & ! forcing for theta shallow
+	      ,cuforc_sh_g(ngrid)%lsfrt   & ! forcing for rv shallow 
+              ,level                      &
+	      ,micro_g(ngrid)%rcp         & ! liquid water
+    	      ,micro_g(ngrid)%rrp         & ! pristine
+    	      ,micro_g(ngrid)%rpp         &
+	      ,micro_g(ngrid)%rsp         &
+    	      ,micro_g(ngrid)%rap         &
+	      ,micro_g(ngrid)%rgp         &
+    	      ,micro_g(ngrid)%rhp         &
+	      ,aot500                     & ! aot at 500nm
+                                     )
+
+!
+!- exchange border information for parallel run
+   if( g3d_spread == 1 .or. g3d_smoothh == 1) then 
+      call PostRecvSendMsgs(OneGrid%SendG3D, OneGrid%RecvG3D)
+      call WaitRecvMsgs(OneGrid%SendG3D, OneGrid%RecvG3D)
+   endif
+!
+!
+!- call routine to do the lateral spread, smooths and limiters/fixers 
+   CALL conv_grell_spread3d_brams(mzp,mxp,myp,ia,iz,ja,jz,dtlt,level,cugd_avedx& 
+	      ,XL			    &
+	      ,CP			    &
+	      ,G			    &
+	      ,rm                           &
+	      ,p00                          &
+	      ,cpor                         & 
+	      ,cuparm_g(ngrid)%CONPRR       &!preci rate
+              ,basic_g(ngrid)%theta         &
+              ,basic_g(ngrid)%thp           &
+              ,basic_g(ngrid)%pp            &
+              ,basic_g(ngrid)%pi0           &
+	      ,basic_g(ngrid)%rv            &
+              ,tend%PT                      &
+	      ,micro_g(ngrid)%rcp           & ! liquid water
+    	      ,micro_g(ngrid)%rrp           & ! pristine
+    	      ,micro_g(ngrid)%rpp           &
+	      ,micro_g(ngrid)%rsp           &
+    	      ,micro_g(ngrid)%rap           &
+	      ,micro_g(ngrid)%rgp           &
+    	      ,micro_g(ngrid)%rhp           &
+!	      ,
+              ,g3d_g(ngrid)%THSRC           & ! temp tendency
+              ,g3d_g(ngrid)%RTSRC           & ! rv tendency
+              ,g3d_g(ngrid)%CLSRC           & ! cloud/ice tendency
+              ,g3d_g(ngrid)%cugd_ttens      &
+              ,g3d_g(ngrid)%cugd_qvtens     &
+              ,g3d_ens_g(apr_gr,ngrid)%apr  &
+              ,g3d_ens_g(apr_w ,ngrid)%apr  &
+              ,g3d_ens_g(apr_mc,ngrid)%apr  &
+              ,g3d_ens_g(apr_st,ngrid)%apr  &
+              ,g3d_ens_g(apr_as,ngrid)%apr  )
+
+
+
+!-------------------------------------------------------------
+elseif(iinqparm==4) then  ! GD FIM version
+   
+   !-no lateral spreading for this scheme
+   cugd_avedx=1
+   
+   CALL GRELLDRV_FIM(                        &
+          dtlt                               & !
+         ,grid_length                        & !
+         ,basic_g(ngrid)%dn0                 & !
+!	 ,RAINCV			     & !
+	 ,cuparm_g(ngrid)%CONPRR             & !
+         ,basic_g(ngrid)%up                  & !
+         ,basic_g(ngrid)%vp                  & !
+         ,basic_g(ngrid)%theta               & !
+         ,basic_g(ngrid)%thp                 & !
+         ,basic_g(ngrid)%pp                  & !
+         ,basic_g(ngrid)%pi0                 & !
+	 ,basic_g(ngrid)%wp		     & !
+	 ,basic_g(ngrid)%rv		     & !
+         ,grid_g(ngrid)%RTGT                 & !
+         ,tend%PT                            & !
+	 ,XL				     & !
+	 ,CP				     & !
+	 ,G				     & !
+	 ,rm				     &
+	 ,p00				     &
+	 ,cpor  			     & !
+         ,g3d_ens_g(apr_gr,ngrid)%apr        &
+         ,g3d_ens_g(apr_w,ngrid) %apr        &
+         ,g3d_ens_g(apr_mc,ngrid)%apr        &
+         ,g3d_ens_g(apr_st,ngrid)%apr        &
+         ,g3d_ens_g(apr_as,ngrid)%apr        &
+         ,g3d_g(ngrid)%xmb_deep              &
+         ,g3d_g(ngrid)%xmb_shallow           &
+!===
+!        ,APR_GR(ims:ime,jms:jme)	     & !
+!	 ,APR_W (ims:ime,jms:jme)	     & !
+!	 ,APR_MC(ims:ime,jms:jme)	     & !
+!	 ,APR_ST(ims:ime,jms:jme)	     & !
+!	 ,APR_AS(ims:ime,jms:jme)	     & !
+!        ,APR_CAPMA(ims:ime,jms:jme)	     & !
+!	 ,APR_CAPME(ims:ime,jms:jme)         & !
+!	 ,APR_CAPMI (ims:ime,jms:jme)	     & !
+!        ,xmb_deep(ims:ime,jms:jme)	     & !
+!        ,xmb_shallow (ims:ime,jms:jme)      & 
+!	 ,XF_ENS			     & !
+!	 ,PR_ENS			     & !
+!===
+	 ,grid_g(ngrid)%topt                 &
+         ,leaf_g(ngrid)%patch_area           &
+	 ,npatch                             &
+         ,radiate_g(ngrid)%rshort            &
+!        ,edt_out                            &
+!        ,GDC				     &
+!	 ,GDC2  			     &
+!	 ,kpbl  			     &
+!	 ,k22_shallow			     &
+!	 ,kbcon_shallow 		     & 
+!        ,ktop_shallow			     & 
+	 ,cugd_avedx			     & 
+	 ,imomentum			     & 
+         ,ensdim,maxiens,maxens,maxens2,maxens3,icoic      & 
+         ,ishallow_g3                       & 
+	 ,ids,ide, jds,jde, kds,kde         & 
+         ,ims,ime, jms,jme, kms,kme         &
+         ,ips,ipe, jps,jpe, kps,kpe         &
+         ,its,ite, jts,jte, kts,kte         &
+!==
+         ,g3d_g(ngrid)%THSRC                & ! temp tendency
+         ,g3d_g(ngrid)%RTSRC                & ! rv tendency
+         ,g3d_g(ngrid)%CLSRC                & ! cloud/ice tendency
+!==
+! forcings -  for deep/shallow
+         ,cuforc_g   (ngrid)%lsfth          & ! forcing for theta deep
+         ,cuforc_g   (ngrid)%lsfrt          & ! forcing for rv deep
+         ,cuforc_sh_g(ngrid)%lsfth          & ! forcing for theta shallow
+         ,cuforc_sh_g(ngrid)%lsfrt          & ! forcing for rv shallow
+         ,level                             &
+	 ,micro_g(ngrid)%rcp		    & ! liquid water
+    	 ,micro_g(ngrid)%rrp                & ! pristine
+    	 ,micro_g(ngrid)%rpp                &
+	 ,micro_g(ngrid)%rsp                &
+    	 ,micro_g(ngrid)%rap                &
+	 ,micro_g(ngrid)%rgp                &
+    	 ,micro_g(ngrid)%rhp                )
+
+
+elseif(iinqparm==5) then  ! GF scheme 
+   !
+   !- no lateral spreading
+   cugd_avedx=1
+ 
+   if(ilwrtyp==4 .or. iswrtyp==4) THEN
+   	aot500(:,:)=carma(ngrid)%aot(:,:,11)
+   else
+   	aot500(:,:)=0.0
+   end if
+   
+   CALL GFDRV( CCATT                        &
+              ,mgmxp,mgmyp,mgmzp,ngrid,ngrids_cp,iens &
+              ,mynum,i0,j0,time,mzp,mxp,myp &
+              ,dtlt         		    & !
+              ,grid_length                  & !
+              ,autoconv                     & !
+              ,aerovap                      & !
+              ,basic_g(ngrid)%dn0           & !
+	      ,cuparm_g(ngrid)%CONPRR       & !
+              ,basic_g(ngrid)%up            & !
+              ,basic_g(ngrid)%vp            & !
+              ,basic_g(ngrid)%theta         & !
+              ,basic_g(ngrid)%thp           & !
+              ,basic_g(ngrid)%pp            & !
+              ,basic_g(ngrid)%pi0           & !
+	      ,basic_g(ngrid)%wp            & !
+	      ,basic_g(ngrid)%rv            & !
+	      ,basic_g(ngrid)%rtp           & !
+              ,grid_g(ngrid)%RTGT           & !
+              ,tend%PT                      & !
+	      ,XL			    & !
+	      ,CP			    & !
+	      ,G			    & !
+	      ,rm                           &
+	      ,p00                          &
+	      ,cpor                         & !
+	      ,rgas                         & !
+	      ,zmn(:,ngrid)                 & !
+	      ,ztn(:,ngrid)                 & !
+              ,g3d_ens_g(apr_gr,ngrid)%apr  &
+              ,g3d_ens_g(apr_w ,ngrid)%apr  &
+              ,g3d_ens_g(apr_mc,ngrid)%apr  &
+              ,g3d_ens_g(apr_st,ngrid)%apr  &
+              ,g3d_ens_g(apr_as,ngrid)%apr  &
+              ,g3d_g(ngrid)%xmb_deep        &
+              ,g3d_g(ngrid)%xmb_shallow     &
+!              
+	      ,g3d_ens_g(apr_gr,ngrid)%weight &
+              ,g3d_ens_g(apr_w ,ngrid)%weight &
+              ,g3d_ens_g(apr_mc,ngrid)%weight &
+              ,g3d_ens_g(apr_st,ngrid)%weight &
+              ,g3d_ens_g(apr_as,ngrid)%weight &
+!
+              ,training &
+!===
+!             ,APR_GR(ims:ime,jms:jme)	       & !
+!	      ,APR_W (ims:ime,jms:jme)	       & !
+!	      ,APR_MC(ims:ime,jms:jme)	       & !
+!	      ,APR_ST(ims:ime,jms:jme)	       & !
+!	      ,APR_AS(ims:ime,jms:jme)         & !
+!             ,APR_CAPMA(ims:ime,jms:jme)      & !
+!	      ,APR_CAPME(ims:ime,jms:jme)      & !
+!	      ,APR_CAPMI (ims:ime,jms:jme)     & !
+!             ,xmb_deep(ims:ime,jms:jme)       & !
+!             ,xmb_shallow (ims:ime,jms:jme)   & !
+!	      ,XF_ENS			       & !
+!	      ,PR_ENS			       & !
+!===
+	      ,grid_g(ngrid)%topt              &
+              ,leaf_g(ngrid)%patch_area        &
+	      ,npatch                          &
+              ,radiate_g(ngrid)%rshort         &
+!===
+!             ,edt_out                          		&
+!             ,GDC						&
+!	      ,GDC2						&
+!	      ,kpbl						&
+!	      ,k22_shallow					&
+!	      ,kbcon_shallow      				& 
+!             ,ktop_shallow					& 
+!===
+	      ,cugd_avedx					& 
+	      ,imomentum          				& 
+              ,ensdim_g3d,maxiens,maxens_g3d,maxens2_g3d,maxens3_g3d,icoic      & 
+!             ,ensdim,maxiens,maxens,maxens2,maxens3,icoic      & 
+              ,ishallow_g3                                      & 
+	      ,ids,ide, jds,jde, kds,kde                        & 
+              ,ims,ime, jms,jme, kms,kme                        & 
+              ,ips,ipe, jps,jpe, kps,kpe                        & 
+              ,its,ite, jts,jte, kts,kte                        & 
+!==
+              ,g3d_g(ngrid)%THSRC      & ! temp tendency
+              ,g3d_g(ngrid)%RTSRC      & ! rv tendency
+              ,g3d_g(ngrid)%CLSRC      & ! cloud/ice tendency
+!	      
+              ,g3d_g(ngrid)%cugd_ttens    &
+              ,g3d_g(ngrid)%cugd_qvtens   &
+! forcings -  for deep/shallow
+	      ,cuforc_g(ngrid)%	lsfth     & ! forcing for theta deep
+	      ,cuforc_g(ngrid)%	lsfrt     & ! forcing for rv deep 
+	      ,cuforc_sh_g(ngrid)%lsfth   & ! forcing for theta shallow
+	      ,cuforc_sh_g(ngrid)%lsfrt   & ! forcing for rv shallow 
+              ,level                      &
+	      ,micro_g(ngrid)%rcp         & ! liquid water
+    	      ,micro_g(ngrid)%rrp         & ! pristine
+    	      ,micro_g(ngrid)%rpp         &
+	      ,micro_g(ngrid)%rsp         &
+    	      ,micro_g(ngrid)%rap         &
+	      ,micro_g(ngrid)%rgp         &
+    	      ,micro_g(ngrid)%rhp         &
+	      ,aot500                     &! aot at 500nm
+  	      ,turb_g(ngrid)%sflux_r      &
+              ,turb_g(ngrid)%sflux_t      &
+!- for convective transport-start
+              ,ierr4d  		     &  	     
+	      ,jmin4d  		     & 
+	      ,kdet4d  		     & 
+	      ,k224d	             & 
+	      ,kbcon4d 		     & 
+	      ,ktop4d  		     & 
+	      ,kpbl4d  		     & 
+	      ,kstabi4d		     & 
+	      ,kstabm4d		     & 
+	      ,xmb4d		     & 
+	      ,edt4d		     & 
+	      ,pwav4d		     & 
+	      ,pcup5d  		     & 
+              ,up_massentr5d	     &        
+	      ,up_massdetr5d	     &
+	      ,dd_massentr5d	     &
+	      ,dd_massdetr5d	     &
+	      ,zup5d		     &
+	      ,zdn5d   		     & 
+	      ,prup5d  		     & 
+	      ,prdn5d  		     & 
+	      ,clwup5d 		     & 
+	      ,tup5d   		     & 
+!- for convective transport- end
+          			     )
+   endif 
+
+ endif! 002
+!-------------------------------------------------------------
+!-------------------------------------------------------------
+! stores precipitation rate for each closure, only for output/training
+
+ if (training > 0) then
+   do i=1,train_dim
+     call update(mxp*myp, g3d_ens_g(i,ngrid)%accapr,g3d_ens_g(i,ngrid)%apr,dtlt)
+   enddo
+ endif
+!----------------------------------------------------------
+
+ 
+ call accum(int(mxp*myp*mzp,i8), tend%tht, g3d_g(ngrid)%thsrc)
+ call accum(int(mxp*myp*mzp,i8), tend%rtt, g3d_g(ngrid)%rtsrc)
+ 
+
+ call update(mxp*myp, cuparm_g(ngrid)%aconpr   ,cuparm_g(ngrid)%conprr   ,dtlt)
+
+
+ if(do_cupar_mcphys_coupling == 1) then
+   call cupar2mcphysics(mzp,mxp,myp,ia,iz,ja,jz,ngrid,dtlt,& 
+                        g3d_g  (ngrid)%clsrc   ,&
+			basic_g(ngrid)%theta   ,& 
+			basic_g(ngrid)%pp      ,&  
+			basic_g(ngrid)%pi0      )
+ else
+  !if is not to have direct coupling include cloud/ice source at rtotal tendency
+  call accum(int(mxp*myp*mzp,i8), tend%rtt, g3d_g(ngrid)%clsrc)
+ 			
+ endif
+!
+!--------- Convective Transport based on mass flux scheme -
+  if (CCATT == 1 .and. iruncon == 1 .and. iinqparm==5) then
+     if(iens .ne. 1 ) stop 'transp conv with GF only for deep conv'
+     call trans_conv_mflx_GF(iens)
+  end if 
+
+
+end subroutine CUPARM_GRELL3_CATT
+!
+!-------------------------------------------------------------------------------------------------
+!
+subroutine init_weights(ng,n2,n3)
+implicit none
+integer, intent(in)::ng,n2,n3
+integer :: it,i,j
+real sumx
+!- ordem dos pesos
+!apr_gr=001
+!apr_w =002
+!apr_mc=003
+!apr_st=004
+!apr_as=005
+
+if(training == 0) return
+
+!-- training on closures
+if(training == 1) then
+   do it=1,train_dim
+    do j=1,n3
+     do i=1,n2
+    
+       g3d_ens_g(it,ng)%weight(i,j)=0.2 !=1/train_dim  
+       !if(it==apr_st) g3d_ens_g(it,ng)%weight(i,j)=0.
+       
+      !g3d_ens_g(it,ng)%weight(i,j)=float(i+j)*exp(-(float(it-2))**2)*float(i*j)
+
+    enddo;enddo;enddo
+
+!-- training on CAPS
+elseif(training == 2) then
+
+    do j=1,n3; do i=1,n2
+    
+       g3d_ens_g(apr_gr,ng)%weight(i,j)=0.3333 
+       g3d_ens_g(apr_w ,ng)%weight(i,j)=0.3333 
+       g3d_ens_g(apr_mc,ng)%weight(i,j)=0.3333 
+       g3d_ens_g(apr_st,ng)%weight(i,j)=0.0 
+       g3d_ens_g(apr_as,ng)%weight(i,j)=0.0 
+
+     enddo;enddo
+
+endif
+
+
+
+return! <<<<
+if(training == 1) then
+ !- normalize a 1 
+ do j=1,n3
+    do i=1,n2
+     sumx=0.
+     do it=1,train_dim
+       sumx=sumx+g3d_ens_g(it,ng)%weight(i,j)
+     enddo
+      do it=1,train_dim
+      g3d_ens_g(it,ng)%weight(i,j) = g3d_ens_g(it,ng)%weight(i,j)/sumx
+     enddo
+ enddo;enddo    
+endif
+
+end subroutine init_weights
+!-------------------------------------------------------------
+!-------------------------------------------------------------
+SUBROUTINE conv_grell_spread3d_brams(m1,m2,m3,ia,iz,ja,jz,dt, &
+               level,cugd_avedx,                              & 
+	       XLV,CP,G,r_v,p00,cpor,                         & 					 
+               conprr, theta,thetail,pp,pi0,                  &
+	       rv,pt,rcp,rrp,rpp,rsp,rap,rgp,rhp,             &
+	       RTHcuten,				      &
+               RQVcuten,				      &
+	       RQCcuten,				      &
+               cugd_ttens,				      & 
+	       cugd_qvtens,				      & 
+               apr_gr,					      & 
+	       apr_w,					      & 
+	       apr_mc,					      & 
+	       apr_st,					      & 
+	       apr_as					      ) 
+	       
+IMPLICIT NONE
+
+   INTEGER,      INTENT(IN   ) :: m1,m2,m3,ia,iz,ja,jz,level,cugd_avedx
+   REAL,         INTENT(IN   ) :: dt
+   REAL,         INTENT(IN   ) :: XLV, R_v
+   REAL,         INTENT(IN   ) :: CP,G, cpor, p00
+   
+   REAL, DIMENSION(m1,m2,m3),INTENT(IN   ) ::     &
+ 	  	 theta   ,& 
+          	 thetail ,& 
+          	 pp	 ,& 
+          	 pi0	 ,& 
+        	 pt	 ,&
+        	 rv      ,rcp,rrp,rpp,rsp,rap,rgp,rhp           
+
+   
+   REAL, DIMENSION(m2,m3),INTENT(INOUT) ::   &
+               conprr,                       &
+               apr_gr,			     & 
+	       apr_w ,			     & 
+	       apr_mc,			     & 
+	       apr_st,			     & 
+	       apr_as			      
+   
+   
+   
+   REAL, DIMENSION(m1,m2,m3),INTENT(INOUT) ::    &
+                        RTHcuten,    &
+                        RQVcuten,    &
+                        RQCcuten,    &
+                        cugd_ttens,  & 
+	                cugd_qvtens			  
+   
+
+  ! local var 
+   REAL  ::   exner,r_sol,r_liq,fxc,tempk,dfxcdt,outt
+   INTEGER :: j,i,k,kk,jfs,jfe,ifs,ife,kts,kte,ii,jj
+   INTEGER :: cugd_spread
+
+   REAL, DIMENSION (m1,m2,m3) :: & ! orig (its-2:ite+2,kts:kte,jts-2:jte+2) ::     &
+          RTHcuten_tmp, &  ! tmp RTHcuten
+	  RQVcuten_tmp     ! tmp RQVcuten
+
+   REAL, DIMENSION (m2,m3) :: & ! orig (its-2:ite+2,jts-2:jte+2) ::
+          Qmem
+
+   REAL   :: & ! orig (its-1:ite+1,jts-1:jte+1) :: 
+          smTT,smTQ
+
+   REAL, DIMENSION (m1) :: & ! orig (kts:kte) :: 
+          conv_TRASHT,conv_TRASHQ
+
+   REAL :: Qmem1,Qmem2,Qmemf,Thresh
+
+  !-initial settings
+  ! g3d_smoothh=0  ! 0 or 1: do horizontal smoothing
+  ! g3d_smoothv=0  ! 0 or 1: do vertical smoothing
+   cugd_spread=cugd_avedx/2 ! = 0/1 => no/do spreading
+
+   RTHcuten_tmp  = 0.0
+   RQVcuten_tmp  = 0.0
+   Qmem       = 1.0
+   smTT       = 0.0
+   smTQ       = 0.0
+   conv_TRASHT= 0.0
+   conv_TRASHQ= 0.0
+   jfs=ja
+   jfe=jz
+   ifs=ia
+   ife=iz
+   kts=2
+   kte=m1-1 !check if this correct or should be kte=m1
+   
+   !if(g3d_smoothh ==1 .or. cugd_spread > 0) then
+   !  jfs=1
+   !  jfe=m3
+   !  ifs=1
+   !  ife=m2
+   !endif
+   
+   !- store input tendencies
+   ! *** jm note -- for smoothing this goes out one row/column beyond tile in i and j
+   do j=1,m3
+     do i=1,m2
+         RTHcuten_tmp(:,i,j)=RTHcuten (:,i,j) 
+         RQVcuten_tmp(:,i,j)=RQVcuten (:,i,j) 
+     enddo
+   enddo
+
+
+
+! ---------------- spreading   section --------------
+   do j=ja,jz
+     do i=ia,iz
+!
+! for high res run, spread the subsidence
+! this is tricky......only consider grid points where there was no rain,
+! so cugd_tten and such are zero!
+!
+!      if do spreading
+       if(cugd_spread > 0)then
+         do k=kts,kte
+	    do jj=j-1,j+1 ! only 3 neighboors
+	      do ii=i-1,i+1 ! only 3 neighboors
+
+               RTHcuten_tmp(k,i,j)=RTHcuten_tmp(k,i,j)     &
+                                            +Qmem(ii,jj)*cugd_ttens(k,ii,jj)
+
+               RQVcuten_tmp(k,i,j)=RQVcuten_tmp(k,i,j)     &
+                                            +Qmem(ii,jj)*cugd_qvtens(k,ii,jj)
+             enddo
+           enddo
+         enddo
+!      end spreading
+!
+!      if not spreading
+       elseif(cugd_spread == 0)then
+         do k=kts,kte
+           RTHcuten_tmp(k,i,j)=RTHcuten_tmp(k,i,j)+cugd_ttens (k,i,j)
+           RQVcuten_tmp(k,i,j)=RQVcuten_tmp(k,i,j)+cugd_qvtens(k,i,j)
+         enddo
+       endif
+!
+     enddo  ! end i
+   enddo  ! end j
+
+! ----------------horizontal smoothing  section --------------
+
+!- if not doing horizontal smoothing, get the final tendencies
+  if(g3d_smoothh == 0)then 
+      do j=ja,jz
+         do i=ia,iz
+            do k=kts,kte
+               RTHcuten(k,i,j)=RTHcuten_tmp(k,i,j) 
+               RQVcuten(k,i,j)=RQVcuten_tmp(k,i,j)
+            enddo ! enf k
+          enddo  ! end j
+      enddo  ! end j
+	  
+!- if doing horizontal smoothing ...      
+   else if(g3d_smoothh == 1)then   
+      do k=kts,kte      
+        do j=ja,jz
+           do i=ia,iz
+
+	    smTT = 0.0
+            smTQ = 0.0
+	    do jj=j-1,j+1 ! only 3 neighboors
+	      do ii=i-1,i+1 ! only 3 neighboors
+               smTT = smTT +RTHcuten_tmp(k,ii,jj)
+	       smTQ = smTQ +RQVcuten_tmp(k,ii,jj)
+            
+              enddo  ! end ii
+            enddo  ! end jj
+	    
+            RTHcuten(k,i,j)=(3.*RTHcuten_tmp(k,i,j) + smTT)/12.
+            RQVcuten(k,i,j)=(3.*RQVcuten_tmp(k,i,j) + smTQ)/12.
+
+            enddo  ! end i
+          enddo  ! end j
+       enddo  ! end k
+
+   endif  ! g3d_smoothh
+  !
+  ! - checking and limiting moistening/heating rates
+  !
+   do j=ja,jz
+      do i=ia,iz
+        !--- moistening section ------
+	Qmemf  = 1.0
+        Thresh = 1.e-20
+        do k=kts,kte              
+         
+	 if(RQVcuten(k,i,j) < 0.0) then
+	    Qmem1 = rv(k,i,j)+RQVcuten(k,i,j)*dt
+	    if(Qmem1 < Thresh)then
+              Qmem1 = RQVcuten(k,i,j)
+              Qmem2 = (Thresh-rv(k,i,j))/dt
+              Qmemf = min(Qmemf,Qmem2/Qmem1)
+              Qmemf = max(0.,Qmemf)
+              Qmemf = min(1.,Qmemf)
+            endif
+          endif
+
+         enddo  ! end k
+         ! - limiting moistening 
+         do k=kts,kte
+          RQVcuten   (k,i,j) = RQVcuten   (k,i,j)*Qmemf
+          RQCcuten   (k,i,j) = RQCcuten   (k,i,j)*Qmemf
+          RTHcuten   (k,i,j) = RTHcuten   (k,i,j)*Qmemf
+	  cugd_ttens (k,i,j) = cugd_ttens (k,i,j)*Qmemf			
+          cugd_qvtens(k,i,j) = cugd_qvtens(k,i,j)*Qmemf			  
+
+         enddo ! end k
+         
+	 !- limiting precip for consistency
+	 conprr (i,j) = conprr (i,j)*Qmemf
+         apr_gr (i,j) = apr_gr (i,j)*Qmemf		      
+	 apr_w  (i,j) = apr_w  (i,j)*Qmemf		      
+	 apr_mc (i,j) = apr_mc (i,j)*Qmemf		      
+	 apr_st (i,j) = apr_st (i,j)*Qmemf		      
+	 apr_as (i,j) = apr_as (i,j)*Qmemf		      
+         ! no futuro inclua tambem o limting para o fluxo de massa
+	 ! xmb(i,j)=xmb(i,j)*qmemf
+	 
+	 !--- heating section ------
+         Thresh=200. ! max heating/cooling rate allowed  K/day
+!srf         Thresh=100. ! max heating/cooling rate allowed  K/day
+         Qmemf=1.
+         Qmem1=0.
+         
+	 do k=kts,kte
+            Qmem1=abs(RTHcuten(k,i,j))*86400. 
+
+            if(Qmem1 > Thresh)then
+              Qmem2 = Thresh/Qmem1
+              Qmemf = min(Qmemf,Qmem2)
+              Qmemf = max(0.,Qmemf) 
+            endif
+         enddo
+	 
+         ! - limiting heating/cooling 
+         do k=kts,kte
+          RTHcuten   (k,i,j) = RTHcuten   (k,i,j)*Qmemf
+          RQVcuten   (k,i,j) = RQVcuten   (k,i,j)*Qmemf
+          RQCcuten   (k,i,j) = RQCcuten   (k,i,j)*Qmemf
+	  cugd_ttens (k,i,j) = cugd_ttens (k,i,j)*Qmemf			
+          cugd_qvtens(k,i,j) = cugd_qvtens(k,i,j)*Qmemf			  
+         enddo ! end k
+	 
+	 !- limiting precip for consistency
+	 conprr (i,j) = conprr (i,j)*Qmemf
+         apr_gr (i,j) = apr_gr (i,j)*Qmemf		      
+	 apr_w  (i,j) = apr_w  (i,j)*Qmemf		      
+	 apr_mc (i,j) = apr_mc (i,j)*Qmemf		      
+	 apr_st (i,j) = apr_st (i,j)*Qmemf		      
+	 apr_as (i,j) = apr_as (i,j)*Qmemf		      
+         ! no futuro inclua tambem o limting para o fluxo de massa
+	 ! xmb(i,j)=xmb(i,j)*qmemf
+
+     enddo  ! end i
+   enddo  ! end j
+  !
+  ! ---  vertical smooth ------------
+  ! 
+   if (g3d_smoothv == 1)then
+   
+    do j=ja,jz
+      do i=ia,iz
+
+          do k=kts+2,kte-2
+            conv_TRASHT(k)= .25*(RTHcuten(k-1,i,j)+2.*RTHcuten(k,i,j)+RTHcuten(k+1,i,j))
+            conv_TRASHQ(k)= .25*(RQVcuten(k-1,i,j)+2.*RQVcuten(k,i,j)+RQVcuten(k+1,i,j))
+          enddo
+          do k=kts+2,kte-2
+            RTHcuten(k,i,j)=conv_TRASHT(k)
+            RQVcuten(k,i,j)=conv_TRASHQ(k)
+          enddo
+     enddo  ! end i
+    enddo  ! end j
+
+   endif
+   
+  ! Converte tend da temperatura (OUTT) em tend de theta (OUTTEM)
+  ! cp*T=Pi*Theta => cp dT/dt = Theta*dPi/dt + Pi*dTheta/dt,
+    
+   !if(level <=2) then
+   
+    do j=ja,jz; do i=ia,iz; do k=kts,kte
+    
+	!if(RTHCUTEN (k,i,j) /= 0.0) then
+	
+           ! Converte tend da temperatura (OUTT) em tend de theta (OUTTEM)
+           ! cp*T=Pi*Theta => cp dT/dt = Theta*dPi/dt + Pi*dTheta/dt,
+           ! Exner's function = pp(k,i,j)+pi0(k,i,j)
+            exner	   = pp(k,i,j) + pi0(k,i,j)
+           ! tendencia do theta devida a conv profunda
+           RTHcuten(k,i,J) = cp/exner * RTHCUTEN(k,i,J) !- theta(k,i,j)*pt(k,i,j)/exner
+        !endif
+	!RQVcuten(k,i,J) = RQVCUTEN(k,i,J)+ RQCCUTEN(k,i,J)
+        !RQCcuten(k,i,J) = 0.
+	
+    enddo; enddo; enddo
+    
+   
+   !elseif(level > 2) then 
+   !
+   ! do j=ja,jz; do i=ia,iz; do k=kts,kte
+   !	    !
+   !	 ! - tend na temperatura (para uso na conversão do thetail
+   !	 outt=RTHCUTEN (k,i,j)
+   !	 ! Exner's function = pp(k,i,j)+pi0(k,i,j)
+   !	 exner= pp(k,i,j) + pi0(k,i,j)
+   !	 if(outt /= 0.0 ) then
+   !	   !
+   !	   ! converte tend da temperatura (outt) em tend de theta (outtem)
+   !	   ! cp*T=Pi*Theta => cp dT/dt = Theta*dPi/dt + Pi*dTheta/dt,
+   !
+   !	   ! tendencia do theta  devida a conv profunda
+   !	   RTHCUTEN (k,i,j) = cp/exner * RTHCUTEN(k,i,j) - theta(k,i,j)*pt(k,i,j)/exner
+   !
+   !	 endif
+   !
+   !	 ! tendencia do theta_il devida a conv profunda
+   !	 r_liq= max(0.,rcp(k,i,j) + rrp(k,i,j))
+   !
+   !	 r_sol= max(0.,rsp(k,i,j)+rpp(k,i,j)+ &
+   !		       rap(k,i,j)+rgp(k,i,j)+  &
+   !		       rhp(k,i,j))
+   !	 
+   !	 tempk = theta(k,i,j)*(exner)/cp ! air temp (Kelvin)
+   !
+   !	 if(tempk.le.253) then
+   !	   fxc =   (2.5e6*r_liq+2.83e6*r_sol)/(cp*amax1(tempk,253.)) 
+   !	   
+   !	   dfxcdt = 2.83e6*RQCCUTEN(k,i,J)/(cp*amax1(tempk,253.))
+   !	   
+   !	  RTHCUTEN (k,i,j) = (1./(1.+fxc))*( RTHCUTEN (k,i,j) - thetail(k,i,j)*dfxcdt ) 
+   !     
+   !     else
+   !     
+   !       fxc =   (2.5e6*r_liq+2.83e6*r_sol)/(cp*amax1(tempk,253.)) 
+   !
+   !!orig     dfxcdt = 2.5e6*OUTQC(I,K)*cuten(i)/(cp*amax1(tempk,253.)) - & 
+   !!orig         fxc/(cp*amax1(tempk,253.)) * cp * OUTT(I,K)
+!  !         
+   !	  dfxcdt = 2.5e6*RQCCUTEN(k,i,J)/(cp*amax1(tempk,253.)) - & 
+   !          	   fxc/(cp*amax1(tempk,253.)) * cp * OUTT
+   !       
+   !       RTHCUTEN (k,i,j) = (1./(1.+fxc))*( RTHCUTEN (k,i,j) - thetail(k,i,j)*dfxcdt ) 
+   !     
+   !     endif
+   !
+   ! enddo; enddo; enddo
+   !endif
+  !- tendencies at boundaries
+   RTHcuten(1,ia:iz,ja:jz)=RTHcuten(2,ia:iz,ja:jz)
+   RQVcuten(1,ia:iz,ja:jz)=RQVcuten(2,ia:iz,ja:jz)
+   RQCcuten(1,ia:iz,ja:jz)=RQCcuten(2,ia:iz,ja:jz)
+  
+   RTHcuten(m1,ia:iz,ja:jz)=RTHcuten(m1-1,ia:iz,ja:jz)
+   RQVcuten(m1,ia:iz,ja:jz)=RQVcuten(m1-1,ia:iz,ja:jz)
+   RQCcuten(m1,ia:iz,ja:jz)=RQCcuten(m1-1,ia:iz,ja:jz)
+  
+END SUBROUTINE conv_grell_spread3d_brams
+
+!-------------------------------------------------------------
+
+  subroutine StoreNamelistFileAtCup_grell3(oneNamelistFile)
+    implicit none
+    type(namelistFile), pointer :: oneNamelistFile
+    
+    g3d_spread = oneNamelistFile%g3d_spread
+    g3d_smoothh = oneNamelistFile%g3d_smoothh
+    g3d_smoothv = oneNamelistFile%g3d_smoothv
+    
+  end subroutine StoreNamelistFileAtCup_grell3
+
+END MODULE CUPARM_GRELL3

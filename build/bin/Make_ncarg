@@ -1,0 +1,46 @@
+#Makefile Make_utils
+############################## Change Log ##################################
+# 1.0.0.0
+#
+# 000908 MJB Make.utils ##
+#            New methodology in rules and targets (including removal of
+#            alternate targets for IBM).
+#            Added dependencies on include and use files. ##
+#
+############################################################################
+
+# Define path and compilation 
+
+include paths.mk
+include include.mk.$(OPT)
+
+# Compiler commands.
+
+INCLUDES   = -I$(UTILS_INCS) $(PAR_INCS)
+F_COMMAND  = $(F_COMP) -c $(F_OPTS) $(INCLUDES)
+C_COMMAND  = $(C_COMP) -c $(C_OPTS) -D$(CMACH) $(INCLUDES) $(PAR_DEFS)
+
+# Define objects.
+
+include objects_ncarg.mk
+
+
+# Define targets.
+
+all:  $(LIBNCARG)
+	@echo ""
+	@echo Finished building === $(LIBNCARG)
+	@echo ""
+
+$(LIBNCARG): $(OBJ_NCARG)
+	@echo obj_ncarg= $(OBJ_NCARG)	
+	@echo libncarg= $(LIBNCARG)	
+	@echo archive= $(ARCHIVE)	
+	$(ARCHIVE) $(LIBNCARG) $(OBJ_NCARG)
+
+clean:
+	@echo ""
+	rm -f $(LIBNCARG) *.o *.mod
+	@echo ""
+      
+include depend_ncarg.mk

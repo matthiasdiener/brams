@@ -1,0 +1,25 @@
+#Makefile include include.mk.opt.gnu-mac
+
+# libraries.
+
+BASE=$(RAMS_ROOT)/build/
+LIBUTILS=$(BASE)/libutils-$(UTILS_VERSION)-opt.a
+
+#-----------------  LINUX INTEL FORTRAN-95 Compiler/GCC  ---------
+CMACH=PC_LINUX1
+F_COMP=h5pfc
+F_OPTS=
+C_COMP=h5pcc
+C_OPTS=$(F_OPTS) 
+LOADER=h5pfc
+LOADER_OPTS=$(F_OPTS)
+C_LOADER=h5pcc
+LIBS=
+MOD_EXT=mod
+
+#---------------If using scritps 'mpicc' e 'mpif90'---------------'
+PAR_DEFS=-DRAMS_MPI
+
+ARCHIVE= ar rs
+
+

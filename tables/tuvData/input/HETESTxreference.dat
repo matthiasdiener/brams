@@ -1,0 +1,83 @@
+!Crossreference TUV photolises
+!each reaction in tuv (left) is the same of the number (right)
+! 
+'O2 -> O + O                                           ',000,F 01
+'O3 -> O2 + O(1D)                                      ',002,T 02
+'O3 -> O2 + O(3P)                                      ',003,T 03
+'NO2 -> NO + O(3P)                                     ',001,T 04
+'NO3 -> NO + O2                                        ',007,T 05
+'NO3 -> NO2 + O(3P)                                    ',008,T 06
+'N2O5 -> NO3 + NO + O(3P)                              ',000,F 07
+'N2O5 -> NO3 + NO2                                     ',000,F 08
+'N2O -> N2 + O(1D)                                     ',000,F 09
+'HO2 -> OH + O                                         ',000,F 10
+'H2O2 -> 2 OH                                          ',009,T 11
+'HNO2 -> OH + NO                                       ',004,T 12
+'HNO3 -> OH + NO2                                      ',005,T 13
+'HNO4 -> HO2 + NO2                                     ',006,T 14
+'CH2O -> H + HCO                                       ',011,T 15
+'CH2O -> H2 + CO                                       ',010,T 16
+'CH3CHO -> CH3 + HCO                                   ',000,T 17
+'CH3CHO -> CH4 + CO                                    ',000,F 18
+'CH3CHO -> CH3CO + H                                   ',000,F 19
+'C2H5CHO -> C2H5 + HCO                                 ',000,F 20
+'CHOCHO -> HCO + HCO                                   ',000,T 21
+'CHOCHO -> CH2O + CO                                   ',000,T 22
+'CH3COCHO -> CH3CO + HCO                               ',000,T 23
+'CH3COCH3 -> CH3CO + CH3                               ',000,T 24
+'CH3OOH -> CH3O + OH                                   ',012,T 25
+'CH3ONO2 -> CH3O + NO2                                 ',000,F 26
+'CH3CO(OONO2) -> Products                              ',000,F 27
+'ClOO -> Products                                      ',000,F 28
+'ClONO2 -> Cl + NO3                                    ',013,T 29
+'ClONO2 -> ClO + NO2                                   ',014,T 30
+'CH3Cl -> Products                                     ',000,F 31
+'CCl2O -> Products                                     ',000,F 32
+'CCl4 -> Products                                      ',000,F 33
+'CClFO -> Products                                     ',000,F 34
+'CF2O -> Products                                      ',000,F 35
+'CF2ClCFCl2 (CFC-113) -> Products                      ',000,F 36
+'CF2ClCF2Cl (CFC-114) -> Products                      ',000,F 37
+'CF3CF2Cl (CFC-115) -> Products                        ',000,F 38
+'CCl3F (CFC-11) -> Products                            ',000,F 39
+'CCl2F2 (CFC-12) -> Products                           ',000,F 40
+'CH3CCl3 -> Products                                   ',000,F 41
+'CF3CHCl2 (HCFC-123) -> Products                       ',000,F 42
+'CF3CHFCl (HCFC-124) -> Products                       ',000,F 43
+'CH3CFCl2 (HCFC-141b) -> Products                      ',000,F 44
+'CH3CF2Cl (HCFC-142b) -> Products                      ',000,F 45
+'CF3CF2CHCl2 (HCFC-225ca) -> Products                  ',000,F 46
+'CF2ClCF2CHFCl (HCFC-225cb) -> Products                ',000,F 47
+'CHClF2 (HCFC-22) -> Products                          ',000,F 48
+'BrONO2 -> BrO + NO2                                   ',000,F 49
+'BrONO2 -> Br + NO3                                    ',015,T 50
+'CH3Br -> Products                                     ',000,F 51
+'CHBr3 -> Products                                     ',000,F 52
+'CF3Br (Halon-1301) -> Products                        ',000,F 53
+'CF2BrCF2Br (Halon-2402) -> Products                   ',000,F 54
+'CF2Br2 (Halon-1202) -> Products                       ',000,F 55
+'CF2BrCl (Halon-1211) -> Products                      ',000,F 56
+'Cl2 -> Cl + Cl                                        ',000,F 57
+'CH2(OH)CHO -> Products                                ',000,F 58
+'CH3COCOCH3 -> Products                                ',000,F 59
+'CH3COCHCH2 -> Products                                ',000,F 60
+'CH2C(CH3)CHO -> Products                              ',000,F 61
+'CH3COCO(OH) -> Products                               ',000,F 62
+'CH3CH2ONO2 -> CH3CH2O + NO2                           ',000,F 63
+'CH3CHONO2CH3 -> CH3CHOCH3 + NO2                       ',000,F 64
+'CH2(OH)CH2(ONO2) -> CH2(OH)CH2(O.) + NO2              ',000,F 65
+'CH3COCH2(ONO2) -> CH3COCH2(O.) + NO2                  ',000,F 66
+'C(CH3)3(ONO2) -> C(CH3)3(O.) + NO2                    ',000,F 67
+'ClOOCl -> Cl + ClOO                                   ',015,F 68
+'CH2(OH)COCH3 -> CH3CO + CH2(OH)                       ',000,F 69
+'CH2(OH)COCH3 -> CH2(OH)CO + CH3                       ',000,F 70
+'HOBr -> OH + Br                                       ',019,F 71
+'BrO -> Br + O                                         ',017,F 72
+'Br2 -> Br + Br                                        ',000,F 73
+'                                                      ',000,F 74
+'                                                      ',000,F
+'                                                      ',000,F
+'                                                      ',000,F
+'                                                      ',000,F
+'                                                      ',000,F
+'                                                      ',000,F

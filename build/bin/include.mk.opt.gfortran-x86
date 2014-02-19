@@ -1,0 +1,45 @@
+#Makefile include include.mk.opt
+
+# Define make (gnu make works best).
+
+MAKE=/usr/bin/make
+
+# libraries.
+
+BASE=$(RAMS_ROOT)/build/
+LIBUTILS=$(BASE)/libutils-$(UTILS_VERSION)-opt.a \
+         $(RAMS_ROOT)/src/jules/LIB/libjules_fast.a \
+         $(RAMS_ROOT)/src/jules/LIB/UTILS/drhook_dummy/yomhook.o
+
+# Activate appropriate parts below, comment out others.
+
+# NCAR Graphics.
+
+NCARG_DIR=$(BASE)
+LIBNCARG=$(BASE)/libncarg-$(UTILS_VERSION).a
+LIBNETCDF=$(RAMS_ROOT)/src/jules/LIB/UTILS/netcdf_dummy/jules_netcdf_dummy.o
+#-----------------  LINUX CRAY ---------
+CMACH=PC_LINUX1
+F_COMP=/opt/hdf5-gfortran/bin/h5pfc
+#F_OPTS= -fbacktrace -fbounds-check -g
+#L_OPTS= 
+#        
+L_OPTS= -O0 \
+        -I../../src/jules/LIB/MODS/ 
+
+F_OPTS=$(L_OPTS) -I../../src/jules/LIB/UTILS/netcdf_dummy/ \
+                 -ffree-line-length-256 -Wconversion \
+                 -fbacktrace -fbounds-check -g
+
+C_COMP=/opt/hdf5-gfortran/bin/h5pcc
+C_OPTS=$(F_OPTS)
+LOADER=/opt/hdf5-gfortran/bin/h5pfc
+LOADER_OPTS=$(F_OPTS)
+C_LOADER=/opt/hdf5-gfortran/bin/h5pcc
+LIBS=
+MOD_EXT=mod
+
+#---------------If using scritps 'mpicc' e 'mpif90'---------------'
+PAR_DEFS=-DRAMS_MPI
+
+ARCHIVE=ar rs

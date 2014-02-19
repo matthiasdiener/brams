@@ -1,0 +1,75 @@
+#Makefile Make_model
+############################## Change Log ##################################
+# 4.3.0.1
+#
+############################################################################
+
+# Define path and compilation 
+
+include paths.mk
+include include.mk.$(OPT)
+
+# Compiler commands.
+
+INCLUDES  = -I$(UTILS_INCS)
+F_COMMAND = $(F_COMP) -c $(F_OPTS) $(INCLUDES)
+
+# Define archive and executable names.
+#--(DMK-CCATT-INI)-------------------------------------------
+EXE=$(BASE)/jules$(JULES_VERSION)-ccatt-brams-5.0-$(OPT)-$(CHEM)
+LIBMODEL=$(BASE)/jules$(JULES_VERSION)-ccatt-brams-5.0-$(OPT)-$(CHEM).a
+#--(DMK-CCATT-OLD)-------------------------------------------
+# EXE=$(BASE)/brams-$(OPT)
+# LIBMODEL=$(BASE)/brams-$(OPT).a
+#--(DMK-CCATT-FIM)-------------------------------------------
+
+include objects_model.mk
+
+# Define targets.
+
+all: $(EXE)
+
+$(EXE): $(LIBUTILS) $(LIBMODEL) $(LIBNCARG) $(MAINOBJ) 
+	@echo ""
+	$(LOADER) -o $(EXE) rammain.o $(LOADER_OPTS) $(LIBMODEL) \
+	$(LIBUTILS) $(LIBNCARG) $(LIBNETCDF) $(PAR_LIBS) $(LIBS) $(HDF_LIBS)
+	@echo ""
+	@echo Finished building === $(EXE)
+	@echo ""
+
+$(MAINOBJ):  $(MAIN) 
+	@echo ""
+	cp -f $< $(<F:.f90=.f90)
+	$(F_COMMAND) $(<F:.f90=.f90)
+	rm -f $(<F:.f90=.f90) 
+
+$(LIBMODEL): $(OBJ_MODEL)
+	$(ARCHIVE) $(LIBMODEL) $(OBJ_MODEL)
+
+$(LIBUTILS): FORCE
+	$(MAKE) -f Make_utils OPT=$(OPT)
+
+$(LIBNCARG): FORCE
+	$(MAKE) -f Make_ncarg OPT=$(OPT)
+
+FORCE: 
+
+install:
+	@echo ""
+	ln -fs `pwd`/$(EXE) ../run/$(BASE)
+	ln -fs `pwd`/$(EXE) ../test/$(BASE)
+	@echo ""
+
+clean:
+	@echo ""
+	#(cd ./utils ; $(MAKE) -f Make.utils.$(OPT) OPT=$(OPT) clean)
+	$(MAKE) -f Make_ncarg OPT=$(OPT) clean
+	$(MAKE) -f Make_utils OPT=$(OPT) clean
+	rm -f $(LIBMODEL) $(EXE) *.o *.mod *.f *.stb *.d 
+	rm -f ../$(EXE) ../$(LIBMODEL)
+	@echo ""
+
+# Define dependencies
+
+include depend_model.mk
+

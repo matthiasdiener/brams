@@ -1,0 +1,147 @@
+#Makefile include include.mk.opt
+############################## Change Log ##################################
+# 1.0.0.2
+#
+# 000908 MJB include.mk-mrc ##
+#            Added MAKE environment varaible.
+#            Added free format option to F_OPTS for some platforms. ##
+# 000907 MJB include.mk-mrc ##
+#            Changed the defualts to no NCAR Graphics and no parallel.
+#            Also commented out the machine specifics to force the user to
+#            select the appropriate machine for them. ##
+# 000823 MJB include.mk-mrc ##
+#            New - defines all make environment varaibles and is included
+#            in all make files. ##
+#
+############################################################################
+
+# Define make (gnu make works best).
+
+MAKE=/usr/bin/make
+
+# libraries.
+
+BASE=$(RAMS_ROOT)/build/
+LIBUTILS=$(BASE)/libutils-$(UTILS_VERSION)-opt.a \
+         $(RAMS_ROOT)/src/jules/LIB/libjules_fast.a \
+         $(RAMS_ROOT)/src/jules/LIB/UTILS/drhook_dummy/yomhook.o\
+         /scratchin/grupos/catt-brams/shared/libs/intel/netcdf-4.1.1/lib/libnetcdf.a
+
+LIBNCARG=$(BASE)/libncarg-$(UTILS_VERSION).a
+
+# Activate appropriate parts below, comment out others.
+#HDF_LIBS=-L/dados/dados3/rafaelm/local/BRAMS50-G3D/hdf5-lib/lib -lhdf5 -lhdf5_hl -lhdf5_fortran -lhdf5hl_fortran
+
+#-----------------  LINUX INTEL FORTRAN-95 Compiler/GCC  ---------
+CMACH=PC_LINUX1
+#F_COMP=mpif90 -fc=ifort
+#C_COMP=mpicc -cc=icc
+#LOADER=mpif90 -fc=ifort
+#C_LOADER=mpicc -cc=icc
+
+F_COMP=/stornext/home/poluicao/hdf5-parallel-ifort-gcc/bin/h5pfc
+C_COMP=/stornext/home/poluicao/hdf5-parallel-ifort-gcc/bin/h5pcc
+LOADER=/stornext/home/poluicao/hdf5-parallel-ifort-gcc/bin/h5pfc
+C_LOADER=/stornext/home/poluicao/hdf5-parallel-ifort-gccbin/h5pcc
+
+LIBS=
+MOD_EXT=mod
+
+#Compiler options
+
+#Default:
+#F_OPTS=-O3
+#C_OPTS=-O3 -DLITTLE
+#LOADER_OPTS=-O3
+
+#Depuracao
+F_OPTS= -O0 -traceback -CB -g -I../../src/jules/LIB/MODS/ -I/scratchin/grupos/catt-brams/shared/libs/intel/netcdf-4.1.1/include/
+C_OPTS=
+LOADER_OPTS=-O0 -traceback -CB -g
+
+#Depuracao
+#F_OPTS= -ccl ifort -O3 -check all -traceback -fpe0 -fpstkchk
+#C_OPTS= -ccl icc -O3 -check all -traceback -fpe0 -fpstkchk
+#LOADER_OPTS= -ccl ifort -O3 -check all -traceback -fpe0 -fpstkchk
+
+
+#Sem Otimizacao
+#F_OPTS= -O0
+#C_OPTS= -O0 -DLITTLE
+#LOADER_OPTS= -O0
+
+
+#teste:
+#F_OPTS= -ccl ifort -FR -O3 -xW -V -Vaxlib
+#C_OPTS= -ccl icc -O3 -xW -V -DLITTLE
+#LOADER_OPTS= -ccl ifort -O3 -xW -V -Vaxlib
+
+#F_OPTS=-tpp6 -FR -O3 -Vaxlib -static
+#C_OPTS=-tpp6 -O3 -DLITTLE
+#LOADER_OPTS=-tpp6 -O3 -static -Vaxlib
+C_LOADER_OPTS=-v
+#-----------------------------------------------------------------
+
+# If compiling for a single-CPU platform only (without MPI):
+
+#-----------------------------------------------------------------
+#PAR_LIBS=
+#PAR_DEFS=
+#-----------------------------------------------------------------
+
+# Else if using MPI libraries:
+
+#---------------SGI-----------------------------------------------
+#with mpich parallel stuff
+#MPI_PATH=/usr/local/mpich
+#PAR_INCS=-I$(MPI_PATH)/include
+#PAR_LIBS=-L$(MPI_PATH)/lib/IRIXN32/ch_shmem -lmpi
+#  or with SGI Parallel stuff
+#PAR_LIBS=-L/usr/lib32 -lmpi
+#  need this for both
+#PAR_DEFS=-DRAMS_MPI
+#-----------------------------------------------------------------
+
+#---------------IBM-----------------------------------------------
+#MPI_PATH=/usr/local/mpich
+#PAR_INCS=-I$(MPI_PATH)/include
+#PAR_LIBS=-L$(MPI_PATH)/lib/rs6000/ch_p4 -lmpi 
+#PAR_DEFS=-DRAMS_MPI
+#-----------------------------------------------------------------
+
+#---------------Sun-----------------------------------------------
+#MPI_PATH=/usr/local/mpich
+#PAR_INCS=-I$(MPI_PATH)/include
+#PAR_LIBS=-L$(MPI_PATH)/lib/solaris/ch_p4 -lmpi 
+#PAR_DEFS=-DRAMS_MPI
+#-----------------------------------------------------------------
+
+#---------------HP-Exemplar---------------------------------------
+#MPI_PATH=/opt/mpi
+#PAR_INCS=-I$(MPI_PATH)/include
+#PAR_LIBS=$(MPI_PATH)/lib/pa1.1/libmpi.a
+#PAR_DEFS=-DRAMS_MPI
+#-----------------------------------------------------------------
+
+#---------------LINUX Portland Group pgf77/gcc--------------------
+#MPI_PATH=/usr/local/mpich
+#PAR_INCS=-I$(MPI_PATH)/include
+#PAR_LIBS=-L$(MPI_PATH)/lib/LINUX/ch_p4 -lmpich
+#PAR_DEFS=-DRAMS_MPI
+#MPI_PATH=/shared/tools/mpichp4-1.2.4
+#PAR_INCS=-I$(MPI_PATH)/include
+#PAR_LIBS=-L$(MPI_PATH)/lib -lmpich -lpmpich
+#PAR_DEFS=-DRAMS_MPI
+#-----------------------------------------------------------------
+
+#---------------If using scritps 'mpicc' e 'mpif90'---------------'
+PAR_DEFS=-DRAMS_MPI
+#-----------------------------------------------------------------
+
+# For IBM,HP,SGI,ALPHA,LINUX use these:
+ARCHIVE=ar rs
+# For NEC SX-6
+#ARCHIVE=sxar rs
+# For SUN,CONVEX
+#ARCHIVE=ar r'
+

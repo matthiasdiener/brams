@@ -1,0 +1,24 @@
+#Makefile include include.mk.opt.gnu-cray
+
+# libraries.
+
+BASE=$(RAMS_ROOT)/build/
+LIBUTILS=$(BASE)/libutils-$(UTILS_VERSION)-opt.a
+
+#-----------------  LINUX CRAY ---------
+CMACH=PC_LINUX1
+F_COMP=ftn 
+F_OPTS=-g -fbacktrace -fbounds-check -finit-local-zero
+#F_OPTS=-O3
+C_COMP=cc
+C_OPTS=$(F_OPTS)
+LOADER=ftn 
+LOADER_OPTS=$(F_OPTS)
+C_LOADER=cc
+LIBS=
+MOD_EXT=mod
+
+#---------------If using scritps 'mpicc' e 'mpif90'---------------'
+PAR_DEFS=-DRAMS_MPI
+
+ARCHIVE=ar rs
