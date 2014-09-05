@@ -1,0 +1,5 @@
+*.mod
+*.o
+*.a
+build/jules3.0-ccatt-brams-5.0-opt.gfortran-x86-CB07_TUV
+src/jules/LIB/jules_fast.exe
