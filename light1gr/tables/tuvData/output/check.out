@@ -1,0 +1,190 @@
+zenith =          0.0
+         1O2 -> O + O              -0.05
+         2O3 -> O2 + O(1D)          0.34
+         3O3 -> O2 + O(3P)         -0.02
+         4NO2 -> NO + O(3P)        -0.04
+         5NO3 -> NO + O2            0.00
+         6NO3 -> NO2 + O(3P)       -0.05
+         8N2O5 -> NO3 + NO2         0.01
+         9N2O -> N2 + O(1D)         0.87
+        10HO2 -> OH + O            -0.01
+        11H2O2 -> 2 OH             -3.07
+        12HNO2 -> OH + NO           0.04
+        13HNO3 -> OH + NO2         -0.00
+        14HNO4 -> HO2 + NO2         0.02
+        15CH2O -> H + HCO          -0.01
+        16CH2O -> H2 + CO          -0.01
+        17CH3CHO -> CH3 + HCO       0.01
+        20C2H5CHO -> C2H5 + HC      0.04
+        21CHOCHO -> HCO + HCO      -0.01
+        22CHOCHO -> CH2O + CO      -0.05
+        23CH3COCHO -> CH3CO +      -0.02
+        24CH3COCH3 -> CH3CO +      -0.02
+        25CH3OOH -> CH3O + OH      -0.02
+        26CH3ONO2 -> CH3O + NO      0.02
+        27CH3CO(OONO2) -> Prod     -0.03
+        58CH2(OH)CHO -> Produc      0.01
+        59CH3COCOCH3 -> Produc      0.02
+        60CH3COCHCH2 -> Produc     -0.02
+        61CH2C(CH3)CHO -> Prod      0.01
+        62CH3COCO(OH) -> Produ     -0.02
+        63CH3CH2ONO2 -> CH3CH2      0.00
+        64CH3CHONO2CH3 -> CH3C     -0.02
+        65CH2(OH)CH2(ONO2) ->       0.13
+        66CH3COCH2(ONO2) -> CH      0.02
+        67C(CH3)3(ONO2) -> C(C      0.01
+        68ClOOCl -> Cl + ClOO       0.02
+        69CH2(OH)COCH3 -> CH3C     -0.01
+        70CH2(OH)COCH3 -> CH2(     -0.01
+zenith =         20.0
+         1O2 -> O + O               0.06
+         2O3 -> O2 + O(1D)          0.37
+         3O3 -> O2 + O(3P)          0.01
+         4NO2 -> NO + O(3P)         0.02
+         5NO3 -> NO + O2           -0.02
+         6NO3 -> NO2 + O(3P)       -0.01
+         8N2O5 -> NO3 + NO2        -0.01
+         9N2O -> N2 + O(1D)         1.02
+        10HO2 -> OH + O             0.00
+        11H2O2 -> 2 OH             -2.96
+        12HNO2 -> OH + NO           0.00
+        13HNO3 -> OH + NO2         -0.01
+        14HNO4 -> HO2 + NO2         0.02
+        15CH2O -> H + HCO           0.00
+        16CH2O -> H2 + CO          -0.01
+        17CH3CHO -> CH3 + HCO       0.03
+        20C2H5CHO -> C2H5 + HC     -0.02
+        21CHOCHO -> HCO + HCO       0.02
+        22CHOCHO -> CH2O + CO       0.00
+        23CH3COCHO -> CH3CO +       0.03
+        24CH3COCH3 -> CH3CO +      -0.01
+        25CH3OOH -> CH3O + OH      -0.00
+        26CH3ONO2 -> CH3O + NO      0.08
+        27CH3CO(OONO2) -> Prod      0.00
+        58CH2(OH)CHO -> Produc      0.00
+        59CH3COCOCH3 -> Produc      0.01
+        60CH3COCHCH2 -> Produc      0.02
+        61CH2C(CH3)CHO -> Prod     -0.01
+        62CH3COCO(OH) -> Produ     -0.01
+        63CH3CH2ONO2 -> CH3CH2      0.05
+        64CH3CHONO2CH3 -> CH3C     -0.00
+        65CH2(OH)CH2(ONO2) ->       0.10
+        66CH3COCH2(ONO2) -> CH     -0.01
+        67C(CH3)3(ONO2) -> C(C     -0.02
+        68ClOOCl -> Cl + ClOO      -0.00
+        69CH2(OH)COCH3 -> CH3C     -0.04
+        70CH2(OH)COCH3 -> CH2(     -0.04
+zenith =         40.0
+         1O2 -> O + O               0.38
+         2O3 -> O2 + O(1D)         -1.51
+         3O3 -> O2 + O(3P)          0.00
+         4NO2 -> NO + O(3P)        -0.07
+         5NO3 -> NO + O2           -0.01
+         6NO3 -> NO2 + O(3P)       -0.01
+         8N2O5 -> NO3 + NO2         0.03
+         9N2O -> N2 + O(1D)         1.29
+        10HO2 -> OH + O             0.01
+        11H2O2 -> 2 OH             -3.84
+        12HNO2 -> OH + NO           0.02
+        13HNO3 -> OH + NO2          0.02
+        14HNO4 -> HO2 + NO2        -0.05
+        15CH2O -> H + HCO          -0.04
+        16CH2O -> H2 + CO          -0.01
+        17CH3CHO -> CH3 + HCO       0.02
+        20C2H5CHO -> C2H5 + HC     -0.00
+        21CHOCHO -> HCO + HCO      -0.02
+        22CHOCHO -> CH2O + CO      -0.01
+        23CH3COCHO -> CH3CO +      -0.08
+        24CH3COCH3 -> CH3CO +       0.02
+        25CH3OOH -> CH3O + OH      -0.01
+        26CH3ONO2 -> CH3O + NO      0.03
+        27CH3CO(OONO2) -> Prod      0.00
+        58CH2(OH)CHO -> Produc      0.03
+        59CH3COCOCH3 -> Produc      0.00
+        60CH3COCHCH2 -> Produc      0.00
+        61CH2C(CH3)CHO -> Prod      0.01
+        62CH3COCO(OH) -> Produ     -0.01
+        63CH3CH2ONO2 -> CH3CH2     -0.01
+        64CH3CHONO2CH3 -> CH3C      0.02
+        65CH2(OH)CH2(ONO2) ->       0.05
+        66CH3COCH2(ONO2) -> CH      0.02
+        67C(CH3)3(ONO2) -> C(C     -0.01
+        68ClOOCl -> Cl + ClOO       0.04
+        69CH2(OH)COCH3 -> CH3C     -0.01
+        70CH2(OH)COCH3 -> CH2(     -0.01
+zenith =         60.0
+         1O2 -> O + O               0.10
+         2O3 -> O2 + O(1D)         -3.08
+         3O3 -> O2 + O(3P)          0.00
+         4NO2 -> NO + O(3P)         0.02
+         5NO3 -> NO + O2            0.02
+         6NO3 -> NO2 + O(3P)        0.07
+         8N2O5 -> NO3 + NO2        -0.08
+         9N2O -> N2 + O(1D)        -1.87
+        10HO2 -> OH + O             1.95
+        11H2O2 -> 2 OH             -3.90
+        12HNO2 -> OH + NO           0.02
+        13HNO3 -> OH + NO2         -0.01
+        14HNO4 -> HO2 + NO2         0.02
+        15CH2O -> H + HCO          -0.01
+        16CH2O -> H2 + CO           0.02
+        17CH3CHO -> CH3 + HCO      -0.04
+        20C2H5CHO -> C2H5 + HC     -0.04
+        21CHOCHO -> HCO + HCO      -0.02
+        22CHOCHO -> CH2O + CO       0.03
+        23CH3COCHO -> CH3CO +       0.01
+        24CH3COCH3 -> CH3CO +       0.04
+        25CH3OOH -> CH3O + OH      -0.01
+        26CH3ONO2 -> CH3O + NO      0.02
+        27CH3CO(OONO2) -> Prod     -0.02
+        58CH2(OH)CHO -> Produc      0.01
+        59CH3COCOCH3 -> Produc      0.02
+        60CH3COCHCH2 -> Produc      0.02
+        61CH2C(CH3)CHO -> Prod      0.00
+        62CH3COCO(OH) -> Produ      0.02
+        63CH3CH2ONO2 -> CH3CH2      0.00
+        64CH3CHONO2CH3 -> CH3C      0.05
+        65CH2(OH)CH2(ONO2) ->      -0.14
+        66CH3COCH2(ONO2) -> CH      0.01
+        67C(CH3)3(ONO2) -> C(C      0.01
+        68ClOOCl -> Cl + ClOO      -0.05
+        69CH2(OH)COCH3 -> CH3C      0.02
+        70CH2(OH)COCH3 -> CH2(      0.02
+zenith =         80.0
+         1O2 -> O + O              -0.61
+         2O3 -> O2 + O(1D)         -6.24
+         3O3 -> O2 + O(3P)         -0.04
+         4NO2 -> NO + O(3P)         0.02
+         5NO3 -> NO + O2           -0.03
+         6NO3 -> NO2 + O(3P)       -0.01
+         8N2O5 -> NO3 + NO2        -0.01
+         9N2O -> N2 + O(1D)        -3.30
+        10HO2 -> OH + O             1.64
+        11H2O2 -> 2 OH             -4.07
+        12HNO2 -> OH + NO          -0.06
+        13HNO3 -> OH + NO2          0.03
+        14HNO4 -> HO2 + NO2        -0.06
+        15CH2O -> H + HCO           0.01
+        16CH2O -> H2 + CO          -0.03
+        17CH3CHO -> CH3 + HCO      -0.01
+        20C2H5CHO -> C2H5 + HC     -0.02
+        21CHOCHO -> HCO + HCO       0.01
+        22CHOCHO -> CH2O + CO       0.03
+        23CH3COCHO -> CH3CO +       0.05
+        24CH3COCH3 -> CH3CO +      -0.07
+        25CH3OOH -> CH3O + OH       0.06
+        26CH3ONO2 -> CH3O + NO      0.04
+        27CH3CO(OONO2) -> Prod      0.04
+        58CH2(OH)CHO -> Produc      0.01
+        59CH3COCOCH3 -> Produc     -0.07
+        60CH3COCHCH2 -> Produc     -0.00
+        61CH2C(CH3)CHO -> Prod     -0.02
+        62CH3COCO(OH) -> Produ     -0.00
+        63CH3CH2ONO2 -> CH3CH2     -0.00
+        64CH3CHONO2CH3 -> CH3C      0.03
+        65CH2(OH)CH2(ONO2) ->       5.77
+        66CH3COCH2(ONO2) -> CH     -0.01
+        67C(CH3)3(ONO2) -> C(C     -0.01
+        68ClOOCl -> Cl + ClOO      -0.01
+        69CH2(OH)COCH3 -> CH3C     -0.04
+        70CH2(OH)COCH3 -> CH2(     -0.04

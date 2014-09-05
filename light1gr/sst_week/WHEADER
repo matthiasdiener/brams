@@ -1,0 +1,8 @@
+  180  181  -90 -180 -0.500000 -0.500000
+     2
+20100303 0000   03   03   00
+20100310 0000   03   10   00
+
+(bksz   NO  lat  lon   iofflat   iofflon)
+(ntimes)
+(fpfx year  mon date hour)

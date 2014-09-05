@@ -1,0 +1,8 @@
+  180  181  -90 -180 -0.500000 -0.500000
+     41
+20080604 0000   06   04   00
+20080611 0000   06   11   00
+
+(bksz   NO  lat  lon   iofflat   iofflon)
+(ntimes)
+(fpfx year  mon date hour)
