@@ -20,22 +20,22 @@ LIBNCARG=$(BASE)/libncarg-$(UTILS_VERSION).a
 LIBNETCDF=$(RAMS_ROOT)/src/jules/LIB/UTILS/netcdf_dummy/jules_netcdf_dummy.o
 #-----------------  LINUX CRAY ---------
 CMACH=PC_LINUX1
-F_COMP=/opt/hdf5-gfortran/bin/h5pfc
+F_COMP=h5pfc
 #F_OPTS= -fbacktrace -fbounds-check -g
-#L_OPTS= 
-#        
+#L_OPTS=
+#
 L_OPTS= -O0 \
-        -I../../src/jules/LIB/MODS/ 
+        -I../../src/jules/LIB/MODS/
 
 F_OPTS=$(L_OPTS) -I../../src/jules/LIB/UTILS/netcdf_dummy/ \
                  -ffree-line-length-256 -Wconversion \
                  -fbacktrace -fbounds-check -g
 
-C_COMP=/opt/hdf5-gfortran/bin/h5pcc
+C_COMP=h5pcc
 C_OPTS=$(F_OPTS)
-LOADER=/opt/hdf5-gfortran/bin/h5pfc
+LOADER=h5pfc
 LOADER_OPTS=$(F_OPTS)
-C_LOADER=/opt/hdf5-gfortran/bin/h5pcc
+C_LOADER=h5pcc
 LIBS=
 MOD_EXT=mod
 

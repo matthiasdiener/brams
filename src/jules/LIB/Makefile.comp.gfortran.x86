@@ -19,8 +19,8 @@
 ## MOD_INC  = Flag for adding Fortran 90 module search paths.          ##
 ## MOD_FSUF = Suffix/extension common to all Fortran 90 modules        ##
 #########################################################################
-FC=/opt/hdf5-gfortran/bin/h5pfc
-CC=/opt/hdf5-gfortran/bin/h5pcc
+FC=h5pfc
+CC=h5pcc
 CPP=
 FPP=-FPP
 FPP_FDEF=-D
